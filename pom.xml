@@ -13,10 +13,21 @@
 
     <groupId>com.shoploc</groupId>
     <artifactId>shoploc-parent</artifactId>
-    <version>1.0.0-SNAPSHOT</version>
-
-    <!-- This project is only a Maven parent/BOM -->
+    <version>1.0.1</version>
     <packaging>pom</packaging>
+
+    <name>ShopLoc Parent</name>
+    <description>Parent POM (BOM + build conventions) shared by all ShopLoc microservices</description>
+
+    <!--
+        Only needed if all services live in ONE repository (monorepo).
+        With one repository per service (parent published on GitHub Packages),
+        leave this block out.
+
+    <modules>
+        <module>shoploc-identity-service</module>
+    </modules>
+    -->
 
     <distributionManagement>
         <repository>
@@ -32,7 +43,7 @@
 
     <properties>
 
-        <!-- Java -->
+        <!-- Java (read automatically by maven-compiler-plugin) -->
         <java.version>21</java.version>
         <maven.compiler.release>${java.version}</maven.compiler.release>
 
@@ -40,31 +51,32 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 
-        <!-- Spring Boot -->
-        <spring-boot.version>3.5.6</spring-boot.version>
+        <!-- Spring Boot: bump to the latest 4.1.x patch when building -->
+        <spring-boot.version>4.1.0</spring-boot.version>
 
-        <!-- Common dependency versions -->
-        <junit.version>5.12.2</junit.version>
-        <mockito.version>5.17.0</mockito.version>
+        <!-- Maven build requirements -->
+        <maven.min.version>3.9.0</maven.min.version>
 
-        <!-- Maven plugins -->
+        <!-- Maven plugins (not managed by the Spring Boot BOM) -->
         <maven.compiler.plugin.version>3.14.0</maven.compiler.plugin.version>
         <maven.surefire.plugin.version>3.5.3</maven.surefire.plugin.version>
         <maven.failsafe.plugin.version>3.5.3</maven.failsafe.plugin.version>
+        <maven.enforcer.plugin.version>3.5.0</maven.enforcer.plugin.version>
         <jacoco.version>0.8.14</jacoco.version>
 
-    </properties>
+        <spring-cloud.version>2025.1.3</spring-cloud.version>
 
+    </properties>
 
     <!-- ====================================================== -->
     <!-- Dependency Management                                  -->
     <!-- ====================================================== -->
 
     <dependencyManagement>
-
         <dependencies>
 
-            <!-- Spring Boot BOM -->
+            <!-- Spring Boot BOM: manages versions of Spring, Jackson, Hibernate,
+                 JUnit, Mockito, etc. Children never declare these versions. -->
             <dependency>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-dependencies</artifactId>
@@ -74,80 +86,171 @@
             </dependency>
 
         </dependencies>
-
     </dependencyManagement>
 
-
     <!-- ====================================================== -->
-    <!-- Plugin Management                                      -->
+    <!-- Build                                                  -->
     <!-- ====================================================== -->
 
     <build>
 
+        <!-- Plugin versions and configuration (nothing runs from here
+             unless a child or the <plugins> block below declares it) -->
         <pluginManagement>
-
             <plugins>
 
-                <!-- Maven Compiler -->
+                <!-- Spring Boot: executable JAR. Each service declares it in its own <build>. -->
+                <plugin>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-maven-plugin</artifactId>
+                    <version>${spring-boot.version}</version>
+                    <configuration>
+                        <!-- Layered JAR: faster, smaller Docker image rebuilds -->
+                        <layers>
+                            <enabled>true</enabled>
+                        </layers>
+                    </configuration>
+                    <executions>
+                        <execution>
+                            <id>repackage</id>
+                            <goals>
+                                <goal>repackage</goal>
+                            </goals>
+                        </execution>
+                    </executions>
+                </plugin>
+
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-compiler-plugin</artifactId>
                     <version>${maven.compiler.plugin.version}</version>
-
                     <configuration>
-                        <release>${java.version}</release>
+                        <!-- Keeps parameter names (needed by Spring for @RequestParam, etc.) -->
+                        <parameters>true</parameters>
                     </configuration>
                 </plugin>
 
-
-                <!-- Unit tests -->
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-surefire-plugin</artifactId>
                     <version>${maven.surefire.plugin.version}</version>
                 </plugin>
 
-
-                <!-- Integration tests -->
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-failsafe-plugin</artifactId>
                     <version>${maven.failsafe.plugin.version}</version>
                 </plugin>
 
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-enforcer-plugin</artifactId>
+                    <version>${maven.enforcer.plugin.version}</version>
+                </plugin>
 
-                <!-- JaCoCo -->
                 <plugin>
                     <groupId>org.jacoco</groupId>
                     <artifactId>jacoco-maven-plugin</artifactId>
                     <version>${jacoco.version}</version>
-
-                    <executions>
-
-                        <execution>
-                            <id>prepare-agent</id>
-                            <goals>
-                                <goal>prepare-agent</goal>
-                            </goals>
-                        </execution>
-
-                        <execution>
-                            <id>report</id>
-                            <phase>verify</phase>
-                            <goals>
-                                <goal>report</goal>
-                            </goals>
-                        </execution>
-
-                    </executions>
-
                 </plugin>
 
             </plugins>
-
         </pluginManagement>
 
-    </build>
+        <!-- Plugins ACTIVE in every child automatically -->
+        <plugins>
 
+            <!-- Fail fast on wrong Java / Maven version -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-enforcer-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>enforce-build-environment</id>
+                        <goals>
+                            <goal>enforce</goal>
+                        </goals>
+                        <configuration>
+                            <rules>
+                                <requireMavenVersion>
+                                    <version>[${maven.min.version},)</version>
+                                </requireMavenVersion>
+                                <requireJavaVersion>
+                                    <version>[${java.version},)</version>
+                                </requireJavaVersion>
+                            </rules>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!-- Integration tests (*IT.java) run during "mvn verify" -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-failsafe-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>integration-test</goal>
+                            <goal>verify</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!-- Code coverage (report: target/site/jacoco, usable by SonarQube) -->
+
+            <!-- Code coverage and minimum coverage enforcement -->
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+
+                <executions>
+                    <!-- Collect coverage while tests execute -->
+                    <execution>
+                        <id>prepare-agent</id>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                    </execution>
+
+                    <!-- Generate XML and HTML reports -->
+                    <execution>
+                        <id>report</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>report</goal>
+                        </goals>
+                    </execution>
+
+                    <!-- Fail the build when line coverage is below 80% -->
+                    <execution>
+                        <id>check-coverage</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                        <configuration>
+                            <rules>
+                                <rule>
+                                    <element>BUNDLE</element>
+                                    <limits>
+                                        <limit>
+                                            <counter>LINE</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>0.80</minimum>
+                                        </limit>
+                                    </limits>
+                                </rule>
+                            </rules>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+
+        </plugins>
+
+    </build>
 
 </project>
