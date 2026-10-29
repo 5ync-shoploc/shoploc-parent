@@ -13,7 +13,7 @@
 
     <groupId>com.shoploc</groupId>
     <artifactId>shoploc-parent</artifactId>
-    <version>1.0.1</version>
+    <version>1.0.2</version>
     <packaging>pom</packaging>
 
     <name>ShopLoc Parent</name>
@@ -75,12 +75,18 @@
     <dependencyManagement>
         <dependencies>
 
-            <!-- Spring Boot BOM: manages versions of Spring, Jackson, Hibernate,
-                 JUnit, Mockito, etc. Children never declare these versions. -->
             <dependency>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-dependencies</artifactId>
                 <version>${spring-boot.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
+            <dependency>
+                <groupId>org.springframework.cloud</groupId>
+                <artifactId>spring-cloud-dependencies</artifactId>
+                <version>${spring-cloud.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
